@@ -5,6 +5,38 @@
 
 extern FILE *yyout;
 
+/* Enumeraci\xc3\xb3n de tipos de nodo para el AST */
+#define NODO_VACIO             0
+#define NODO_TERMINAL          1
+#define SUMA                   2
+#define RESTA                  3
+#define NODO_PUTS              4
+#define ASIGNACION             5
+#define NODO_VARIABLE          6
+#define NODO_SECUENCIA         7
+#define NODO_IF                8
+#define NODO_WHILE             9
+#define IGUAL                 10
+#define MAYOR_QUE             11
+#define MENOR_QUE             12
+#define NODO_ELSIF            13
+#define NODO_ELSE             14
+#define NODO_ELSIF_INDIVIDUAL 15
+#define NODO_RETURN           16
+#define MULTIPLICACION        17
+#define DIVISION              18
+#define AND_LOGICO            19
+#define OR_LOGICO             20
+#define NOT_LOGICO            21
+#define NODO_PARAMETRO        22
+#define CONCATENACION         23
+#define NEGACION              24
+#define NODO_FUNCION          25
+#define NODO_LLAMADA_FUNCION  26
+#define NODO_ASIG_COMPUESTA   27
+#define NODO_CONDICIONAL      28
+#define NODO_BUCLE            29
+
 int contadorEtiqueta = 0;
 int numMaxRegistros = 31;
 int nombreVariable = 0;
@@ -20,15 +52,22 @@ struct variable
 
 struct variable variables[64];
 
+/*\n * Estructura b\xc3\xa1sica para representar un nodo del \n * \xc3\xa1rbol de sintaxis abstracta.\n */
 struct ast
 {
-    struct ast *izq;
-    struct ast *dcha;
-    int tipoNodo;
-    double valor;
-    char *tipo; 
-    int resultado;
-    int nombreVar;
+    int tipoNodo;              /* Tipo de nodo (NODO_*)             */
+    struct ast *izq;           /* Hijo izquierdo                     */
+    struct ast *dcha;          /* Hijo derecho                       */
+    struct ast *siguiente;     /* Para listas de parametros/args     */
+    union {
+        int intVal;
+        float floatVal;
+        char *stringVal;
+        int boolVal;
+    } valor;                   /* Valor asociado al nodo             */
+    char *tipo;                /* Tipo sem\xc3\xa1ntico (integer, float...) */
+    int resultado;             /* Registro/resultado para MIPS       */
+    int nombreVar;             /* Identificador de variable temporal */
 };
 
 int crearNombreVariable()
@@ -61,8 +100,9 @@ struct ast *crearNodoTerminal(double valor)
     struct ast *n = malloc(sizeof(struct ast));
     n->izq = NULL;
     n->dcha = NULL;
-    n->tipoNodo = 1;
-    n->valor = valor;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_TERMINAL;
+    n->valor.floatVal = (float)valor;
     n->resultado = encontrarReg();
     n->nombreVar = crearNombreVariable();
     variables[n->resultado].dato = valor;
@@ -76,8 +116,9 @@ struct ast *crearVariableTerminal(double valor, int reg)
     struct ast *n = malloc(sizeof(struct ast));
     n->izq = NULL;
     n->dcha = NULL;
-    n->tipoNodo = 6;
-    n->valor = valor;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_VARIABLE;
+    n->valor.floatVal = (float)valor;
     n->resultado = reg;
     return n;
 }
@@ -87,16 +128,18 @@ struct ast *crearNodoNoTerminal(struct ast *izq, struct ast *dcha, int tipoNodo)
     struct ast *n = malloc(sizeof(struct ast));
     n->izq = izq;
     n->dcha = dcha;
+    n->siguiente = NULL;
     n->tipoNodo = tipoNodo;
 
-   
-    if (tipoNodo == 2 || tipoNodo == 3 || tipoNodo == 4 || tipoNodo == 10 || tipoNodo == 11 || tipoNodo == 12 || tipoNodo == 17 || tipoNodo == 18)
+    if (tipoNodo == SUMA || tipoNodo == RESTA || tipoNodo == NODO_PUTS ||
+        tipoNodo == IGUAL || tipoNodo == MAYOR_QUE || tipoNodo == MENOR_QUE ||
+        tipoNodo == MULTIPLICACION || tipoNodo == DIVISION)
     {
         n->resultado = encontrarReg();
     }
     else
     {
-        n->resultado = -1; 
+        n->resultado = -1;
     }
 
     return n;
@@ -106,8 +149,138 @@ struct ast *crearNodoVacio()
     struct ast *n = malloc(sizeof(struct ast));
     n->izq = NULL;
     n->dcha = NULL;
-    n->tipoNodo = 0;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_VACIO;
     n->resultado = -1;
+    return n;
+}
+
+/* Funciones auxiliares para construir distintos nodos del AST */
+
+struct ast *crearNodoUnario(struct ast *hijo, int tipo)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = hijo;
+    n->dcha = NULL;
+    n->siguiente = NULL;
+    n->tipoNodo = tipo;
+    n->resultado = -1;
+    return n;
+}
+
+struct ast *crearNodoAsignacion(const char *id, struct ast *expr)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = expr;
+    n->dcha = NULL;
+    n->siguiente = NULL;
+    n->tipoNodo = ASIGNACION;
+    n->valor.stringVal = strdup(id);
+    n->resultado = -1;
+    return n;
+}
+
+struct ast *crearNodoAsignacionCompuesta(const char *id, struct ast *expr, int op)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = expr;
+    n->dcha = NULL;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_ASIG_COMPUESTA;
+    n->valor.stringVal = strdup(id);
+    n->resultado = -1;
+    n->nombreVar = op;
+    return n;
+}
+
+struct ast *crearNodoPuts(struct ast *expr)
+{
+    return crearNodoNoTerminal(expr, NULL, NODO_PUTS);
+}
+
+struct ast *crearNodoParametro(const char *nombre)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = NULL;
+    n->dcha = NULL;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_PARAMETRO;
+    n->valor.stringVal = strdup(nombre);
+    n->resultado = -1;
+    return n;
+}
+
+struct ast *crearNodoFuncion(const char *nombre, struct ast *params, struct ast *cuerpo)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = params;
+    n->dcha = cuerpo;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_FUNCION;
+    n->valor.stringVal = strdup(nombre);
+    n->resultado = -1;
+    return n;
+}
+
+struct ast *crearNodoLlamadaFuncion(const char *nombre, struct ast *args)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = args;
+    n->dcha = NULL;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_LLAMADA_FUNCION;
+    n->valor.stringVal = strdup(nombre);
+    n->resultado = -1;
+    return n;
+}
+
+struct ast *crearNodoCondicional(struct ast *cond, struct ast *cuerpo, struct ast *otro)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = cond;
+    n->dcha = cuerpo;
+    n->siguiente = otro;
+    n->tipoNodo = NODO_CONDICIONAL;
+    n->resultado = -1;
+    return n;
+}
+
+struct ast *crearNodoBucle(struct ast *cond, struct ast *cuerpo)
+{
+    struct ast *n = malloc(sizeof(struct ast));
+    n->izq = cond;
+    n->dcha = cuerpo;
+    n->siguiente = NULL;
+    n->tipoNodo = NODO_BUCLE;
+    n->resultado = -1;
+    return n;
+}
+
+struct ast *crearNodoVariable(const char *nombre, int reg)
+{
+    struct ast *n = crearVariableTerminal(0.0, reg);
+    n->valor.stringVal = strdup(nombre);
+    return n;
+}
+
+struct ast *crearNodoTerminalFloat(float valor)
+{
+    return crearNodoTerminal(valor);
+}
+
+struct ast *crearNodoTerminalString(const char *valor)
+{
+    struct ast *n = crearNodoVacio();
+    n->tipoNodo = NODO_TERMINAL;
+    n->valor.stringVal = strdup(valor);
+    return n;
+}
+
+struct ast *crearNodoTerminalBool(int val)
+{
+    struct ast *n = crearNodoVacio();
+    n->tipoNodo = NODO_TERMINAL;
+    n->valor.boolVal = val;
     return n;
 }
 
