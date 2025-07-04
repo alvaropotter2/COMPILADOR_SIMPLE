@@ -1,0 +1,34 @@
+LEYENDA:
+    P  - Programa principal
+    S  - Secuencia de sentencias  
+    D  - Declaración/Sentencia
+    A  - Asignación
+    E  - Expresión aritmética
+    T  - Término
+    R  - Expresión relacional
+    L  - Expresión lógica
+    I  - Estructura condicional (IF)
+    B  - Estructura de bucle (WHILE)
+    F  - Definición de función
+
+ P → S
+
+• S → D | S D
+
+• D → A | I | B | F | puts E | return E | E
+
+• A → id = E | id += E | id -= E
+
+• E → E + T | E - T | E * T | E / T | -E | T | R | L
+
+• T → id | integer | float | string | true | false | (E) | id(argumentos)
+
+• R → E < E | E > E | E == E | E != E | E <= E | E >= E
+
+• L → E && E | E || E | !E
+
+• I → if E S end | if E S else S end
+
+• B → while E S end
+
+• F → def id S end | def id(parámetros) S end

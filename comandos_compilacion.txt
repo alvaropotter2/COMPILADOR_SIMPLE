@@ -1,0 +1,24 @@
+# Comandos para compilar y ejecutar el compilador Ruby -> MIPS
+
+# 1. Compilar el compilador (solo necesario una vez)
+make
+
+# 2. Limpiar archivos generados (si hay problemas)
+make clean
+
+# 3. Probar con archivos de ejemplo:
+
+# Prueba básica
+./ruby_compiler.exe test.rb
+
+# Prueba con estructuras de control
+./ruby_compiler.exe test_control.rb
+
+# Prueba con funciones
+./ruby_compiler.exe test_funciones.rb
+
+# 4. Ver el código MIPS generado
+cat ruby.asm
+
+# 5. Ejecutar en simulador MIPS
+# Usar MARS para ejecutar ruby.asm
